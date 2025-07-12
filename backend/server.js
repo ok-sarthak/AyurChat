@@ -19,7 +19,7 @@ app.use(limiter);
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173', // Vite default port
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], // Frontend ports
   credentials: true
 }));
 app.use(express.json());

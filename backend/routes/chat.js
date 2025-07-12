@@ -87,7 +87,7 @@ router.post('/:chatId/message', auth, async (req, res) => {
 
     try {
       // Get AI response from Gemini
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       // Build conversation history for context
       const conversationHistory = chat.messages.map(msg => ({
