@@ -86,7 +86,7 @@ router.post('/:chatId/message', auth, async (req, res) => {
     });
 
     try {
-      // Get AI response from Gemini
+      // Get AI response from Gemini with Ayurvedic context
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       // Build conversation history for context
@@ -94,6 +94,22 @@ router.post('/:chatId/message', auth, async (req, res) => {
         role: msg.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: msg.content }]
       }));
+
+      // Ayurvedic system prompt
+      const systemPrompt = `You are an expert Ayurvedic wellness assistant with deep knowledge of traditional Indian medicine. Your responses should be:
+
+1. Rooted in authentic Ayurvedic principles and practices
+2. Practical and actionable for modern lifestyles
+3. Emphasize natural healing, prevention, and holistic wellness
+4. Include relevant Sanskrit terms when appropriate (with explanations)
+5. Consider the three doshas (Vata, Pitta, Kapha) in your advice
+6. Mention herbs, lifestyle practices, yoga, meditation when relevant
+7. Always suggest consulting with qualified Ayurvedic practitioners for serious health concerns
+8. Be warm, wise, and encouraging in tone
+
+Focus on wellness, not medical diagnosis or treatment of diseases. Provide educational information about Ayurvedic approaches to health and well-being.
+
+User question: ${message}`;
 
       const chatSession = model.startChat({
         history: conversationHistory.slice(0, -1), // Exclude the current message
@@ -105,7 +121,7 @@ router.post('/:chatId/message', auth, async (req, res) => {
         },
       });
 
-      const result = await chatSession.sendMessage(message);
+      const result = await chatSession.sendMessage(systemPrompt);
       const aiResponse = result.response.text();
 
       // Add AI response to chat
@@ -122,7 +138,9 @@ router.post('/:chatId/message', auth, async (req, res) => {
 
       await chat.save();
 
+      // Return the complete updated message list
       res.json({
+        messages: chat.messages,
         userMessage: {
           role: 'user',
           content: message,
@@ -149,6 +167,7 @@ router.post('/:chatId/message', auth, async (req, res) => {
 
       res.status(500).json({ 
         message: 'AI service temporarily unavailable',
+        messages: chat.messages,
         userMessage: {
           role: 'user',
           content: message,
@@ -179,6 +198,70 @@ router.delete('/:chatId', auth, async (req, res) => {
   } catch (error) {
     console.error('Delete chat error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Generate dynamic Ayurvedic prompts
+router.post('/generate-prompts', auth, async (req, res) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const promptRequest = `Generate 5 diverse and interesting Ayurvedic wellness questions that users might ask. 
+    Make them specific, practical, and focused on different aspects of Ayurveda like:
+    - Herbs and their benefits
+    - Dosha balancing
+    - Daily routines (Dinacharya)
+    - Seasonal practices (Ritucharya)
+    - Yoga and meditation
+    - Ayurvedic nutrition
+    - Lifestyle practices
+    - Mental wellness
+    
+    Return only the questions as a simple array, no explanations. Each question should be concise and engaging.
+    Example format: ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"]`;
+
+    const result = await model.generateContent(promptRequest);
+    const response = result.response.text();
+    
+    try {
+      // Try to parse the response as JSON
+      const prompts = JSON.parse(response);
+      if (Array.isArray(prompts) && prompts.length === 5) {
+        res.json({ prompts });
+      } else {
+        throw new Error('Invalid format');
+      }
+    } catch (parseError) {
+      // If parsing fails, extract questions manually
+      const questions = response.match(/"([^"]+\?)/g);
+      if (questions && questions.length >= 5) {
+        const cleanQuestions = questions.slice(0, 5).map(q => q.replace(/"/g, ''));
+        res.json({ prompts: cleanQuestions });
+      } else {
+        // Fallback to default prompts
+        res.json({ 
+          prompts: [
+            "What are the benefits of Ashwagandha in daily wellness?",
+            "How can I determine my Ayurvedic constitution (Prakriti)?",
+            "What's an ideal Ayurvedic morning routine for better health?",
+            "How does seasonal eating benefit our well-being in Ayurveda?",
+            "What are the best Ayurvedic practices for mental clarity?"
+          ]
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Generate prompts error:', error);
+    // Return fallback prompts
+    res.json({ 
+      prompts: [
+        "What are the benefits of Ashwagandha in daily wellness?",
+        "How can I determine my Ayurvedic constitution (Prakriti)?",
+        "What's an ideal Ayurvedic morning routine for better health?",
+        "How does seasonal eating benefit our well-being in Ayurveda?",
+        "What are the best Ayurvedic practices for mental clarity?"
+      ]
+    });
   }
 });
 
