@@ -64,6 +64,7 @@ const ChatArea = ({
     scrollToBottom()
   }, [messages, isTyping, scrollToBottom])
 
+  // Load messages when active chat changes
   const loadMessages = useCallback(async (chatId) => {
     if (!chatId) return
     try {
